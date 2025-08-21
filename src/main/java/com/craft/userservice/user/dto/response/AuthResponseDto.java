@@ -1,4 +1,4 @@
-package com.craft.userservice.dto.response;
+package com.craft.userservice.user.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

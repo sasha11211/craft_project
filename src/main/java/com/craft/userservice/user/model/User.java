@@ -1,4 +1,4 @@
-package com.craft.userservice.model;
+package com.craft.userservice.user.model;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -8,7 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import com.craft.userservice.enums.Role;
+import com.craft.userservice.configuration.Role;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

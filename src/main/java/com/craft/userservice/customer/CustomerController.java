@@ -1,4 +1,4 @@
-package com.craft.userservice.controller;
+package com.craft.userservice.customer;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -6,16 +6,16 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.craft.userservice.dto.response.UserResponseDto;
-import com.craft.userservice.model.User;
-import com.craft.userservice.repository.UserRepository;
+import com.craft.userservice.user.dto.response.UserResponseDto;
+import com.craft.userservice.user.model.User;
+import com.craft.userservice.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
-public class UserController {
+public class CustomerController {
 	private final UserRepository userRepository;
 
     @GetMapping("/current")
@@ -28,7 +28,7 @@ public class UserController {
                 user.getId(),
                 user.getFirstName(),
                 user.getLastName(),
-                user.getEmail()
+                user.getEmail(), null, email, email, null, null, null, email, email
         );
         
         return ResponseEntity.ok(response);

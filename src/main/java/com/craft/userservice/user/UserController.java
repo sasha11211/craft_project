@@ -1,4 +1,4 @@
-package com.craft.userservice.controller;
+package com.craft.userservice.user;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -7,17 +7,16 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.craft.userservice.dto.LoginRequestDto;
-import com.craft.userservice.dto.RefreshRequestDto;
-import com.craft.userservice.dto.RegisterRequestDto;
-import com.craft.userservice.service.AuthService;
+import com.craft.userservice.service.jwt.dto.RefreshRequestDto;
+import com.craft.userservice.user.dto.LoginRequestDto;
+import com.craft.userservice.user.dto.RegisterRequestDto;
 
 import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
-public class AuthController {
+public class UserController {
 	private final AuthService authService;
 
 	@PostMapping("/register")

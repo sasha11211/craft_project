@@ -1,4 +1,4 @@
-package com.craft.userservice.service;
+package com.craft.userservice.user;
 
 import java.time.Instant;
 import java.util.HashSet;
@@ -10,16 +10,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.craft.userservice.dto.LoginRequestDto;
-import com.craft.userservice.dto.RefreshRequestDto;
-import com.craft.userservice.dto.RegisterRequestDto;
-import com.craft.userservice.dto.response.AuthResponseDto;
-import com.craft.userservice.dto.response.CustomerResponseDto;
-import com.craft.userservice.enums.Role;
-import com.craft.userservice.model.RefreshToken;
-import com.craft.userservice.model.User;
-import com.craft.userservice.repository.UserRepository;
+import com.craft.userservice.configuration.Role;
 import com.craft.userservice.security.JwtUtil;
+import com.craft.userservice.service.jwt.RefreshTokenService;
+import com.craft.userservice.service.jwt.dto.RefreshRequestDto;
+import com.craft.userservice.service.jwt.model.RefreshToken;
+import com.craft.userservice.user.dto.LoginRequestDto;
+import com.craft.userservice.user.dto.RegisterRequestDto;
+import com.craft.userservice.user.dto.response.AuthResponseDto;
+import com.craft.userservice.user.dto.response.UserResponseDto;
+import com.craft.userservice.user.model.User;
+import com.craft.userservice.user.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 
@@ -42,7 +43,7 @@ public class AuthService {
 		userRepository.save(user);
 		String accessToken = jwtUtil.generateToken(user.getEmail());
 		String refreshToken = refreshTokenService.create(user.getId()).getToken();
-		CustomerResponseDto customerResponseDto = modelMapper.map(user, CustomerResponseDto.class);
+		UserResponseDto customerResponseDto = modelMapper.map(user, UserResponseDto.class);
 		customerResponseDto.setAccessToken(accessToken);
 		customerResponseDto.setRefreshToken(refreshToken);
 		return ResponseEntity.ok(customerResponseDto);
@@ -57,7 +58,7 @@ public class AuthService {
 		String accessToken = jwtUtil.generateToken(user.getEmail());
 		String refreshToken = refreshTokenService.create(user.getId()).getToken();
 
-		CustomerResponseDto customerResponseDto = modelMapper.map(user, CustomerResponseDto.class);
+		UserResponseDto customerResponseDto = modelMapper.map(user, UserResponseDto.class);
 		customerResponseDto.setAccessToken(accessToken);
 		customerResponseDto.setRefreshToken(refreshToken);
 		return ResponseEntity.ok(customerResponseDto);

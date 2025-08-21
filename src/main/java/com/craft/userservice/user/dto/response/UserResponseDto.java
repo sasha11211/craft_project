@@ -1,10 +1,10 @@
-package com.craft.userservice.dto.response;
+package com.craft.userservice.user.dto.response;
 
 import java.time.Instant;
 import java.util.Set;
 
-import com.craft.userservice.enums.Gender;
-import com.craft.userservice.enums.Role;
+import com.craft.userservice.configuration.Gender;
+import com.craft.userservice.configuration.Role;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,7 +13,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class CustomerResponseDto {
+public class UserResponseDto {
 	private String id;
 	private String email;
 	private String firstName;

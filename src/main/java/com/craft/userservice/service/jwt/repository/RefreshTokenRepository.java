@@ -1,10 +1,10 @@
-package com.craft.userservice.repository;
+package com.craft.userservice.service.jwt.repository;
 
 import java.util.Optional;
 
 import org.springframework.data.mongodb.repository.MongoRepository;
 
-import com.craft.userservice.model.RefreshToken;
+import com.craft.userservice.service.jwt.model.RefreshToken;
 
 public interface RefreshTokenRepository extends MongoRepository<RefreshToken, String>{
 	
