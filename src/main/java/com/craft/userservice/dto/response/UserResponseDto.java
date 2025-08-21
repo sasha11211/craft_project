@@ -1,4 +1,4 @@
-package com.craft.userservice.dto;
+package com.craft.userservice.dto.response;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class UserResponse {
+public class UserResponseDto {
 	private String id;
     private String firstName;
     private String lastName;

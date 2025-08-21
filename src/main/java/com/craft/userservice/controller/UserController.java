@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.craft.userservice.dto.UserResponse;
+import com.craft.userservice.dto.response.UserResponseDto;
 import com.craft.userservice.model.User;
 import com.craft.userservice.repository.UserRepository;
 
@@ -24,7 +24,7 @@ public class UserController {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        UserResponse response = new UserResponse(
+        UserResponseDto response = new UserResponseDto(
                 user.getId(),
                 user.getFirstName(),
                 user.getLastName(),
