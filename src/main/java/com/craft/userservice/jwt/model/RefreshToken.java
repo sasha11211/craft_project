@@ -1,4 +1,4 @@
-package com.craft.userservice.service.jwt.model;
+package com.craft.userservice.jwt.model;
 
 import java.time.Instant;
 

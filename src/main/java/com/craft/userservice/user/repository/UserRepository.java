@@ -8,6 +8,8 @@ import com.craft.userservice.user.model.User;
 
 public interface UserRepository extends MongoRepository<User, String>{
 	Optional<User> findByEmail(String email);
+	Optional<User> findByMobile(String mobile);
 	boolean existsByEmail(String emString);
+	boolean existsByMobile(String mobile);
 
 }

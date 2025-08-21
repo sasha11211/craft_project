@@ -1,4 +1,4 @@
-package com.craft.userservice.service.jwt.dto;
+package com.craft.userservice.jwt.dto;
 
 import lombok.Data;
 
