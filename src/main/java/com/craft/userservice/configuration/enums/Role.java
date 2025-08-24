@@ -1,4 +1,4 @@
-package com.craft.userservice.configuration;
+package com.craft.userservice.configuration.enums;
 
 public enum Role {
 	ROLE_CUSTOMER,

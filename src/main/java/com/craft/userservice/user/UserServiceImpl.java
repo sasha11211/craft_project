@@ -10,7 +10,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.craft.userservice.configuration.Role;
+import com.craft.userservice.configuration.enums.Role;
 import com.craft.userservice.jwt.RefreshTokenService;
 import com.craft.userservice.jwt.dto.RefreshRequestDto;
 import com.craft.userservice.jwt.model.RefreshToken;

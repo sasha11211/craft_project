@@ -3,8 +3,8 @@ package com.craft.userservice.user.dto.response;
 import java.time.Instant;
 import java.util.Set;
 
-import com.craft.userservice.configuration.Gender;
-import com.craft.userservice.configuration.Role;
+import com.craft.userservice.configuration.enums.Gender;
+import com.craft.userservice.configuration.enums.Role;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

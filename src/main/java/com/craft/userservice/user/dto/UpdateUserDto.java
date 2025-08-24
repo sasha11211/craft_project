@@ -1,6 +1,6 @@
 package com.craft.userservice.user.dto;
 
-import com.craft.userservice.configuration.Gender;
+import com.craft.userservice.configuration.enums.Gender;
 
 import jakarta.validation.constraints.Pattern;
 import lombok.Data;

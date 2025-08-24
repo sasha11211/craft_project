@@ -8,7 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import com.craft.userservice.configuration.Role;
+import com.craft.userservice.configuration.enums.Role;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
