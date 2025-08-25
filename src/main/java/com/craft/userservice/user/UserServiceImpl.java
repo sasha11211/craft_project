@@ -155,7 +155,7 @@ public class UserServiceImpl implements UserService{
         UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
         userResponseDto.setAccessToken(null);
         userResponseDto.setRefreshToken(null);
-        return ResponseEntity.ok(updateUserDto);
+        return ResponseEntity.ok(userResponseDto);
 	}
 
 }

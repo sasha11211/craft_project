@@ -8,6 +8,7 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.craft.userservice.configuration.enums.Gender;
 import com.craft.userservice.configuration.enums.Role;
 
 import lombok.AllArgsConstructor;
@@ -31,6 +32,7 @@ public class User {
 	private Set<Role> roles = new HashSet<>();
 	private String firstName;
 	private String lastName;
+	private Gender gender;
 	@Indexed(unique = true, sparse = true)
 	private String mobile;
 	private String avatarUrl;
