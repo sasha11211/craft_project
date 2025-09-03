@@ -4,6 +4,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 
 import com.craft.userservice.jwt.dto.RefreshRequestDto;
+import com.craft.userservice.user.dto.AddRoleDto;
 import com.craft.userservice.user.dto.LoginRequestDto;
 import com.craft.userservice.user.dto.RegisterRequestDto;
 import com.craft.userservice.user.dto.UpdateUserDto;
@@ -22,6 +23,8 @@ public interface UserService {
 	public ResponseEntity<?> getCurrentUser(Authentication authentication);
 	
 	public ResponseEntity<?> updateUser(UpdateUserDto updateUserDto, Authentication authentication);
+	
+	public ResponseEntity<?> addRole(AddRoleDto addRoleDto, Authentication authentication);
 	
 
 }

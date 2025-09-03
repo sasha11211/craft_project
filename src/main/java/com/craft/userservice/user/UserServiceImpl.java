@@ -1,12 +1,14 @@
 package com.craft.userservice.user;
 
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 
 import org.modelmapper.ModelMapper;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -16,6 +18,7 @@ import com.craft.userservice.jwt.RefreshTokenService;
 import com.craft.userservice.jwt.dto.RefreshRequestDto;
 import com.craft.userservice.jwt.model.RefreshToken;
 import com.craft.userservice.security.JwtUtil;
+import com.craft.userservice.user.dto.AddRoleDto;
 import com.craft.userservice.user.dto.LoginRequestDto;
 import com.craft.userservice.user.dto.RegisterRequestDto;
 import com.craft.userservice.user.dto.UpdateUserDto;
@@ -127,7 +130,7 @@ public class UserServiceImpl implements UserService {
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
 		}
-		
+
 	}
 
 	@Override
@@ -140,8 +143,8 @@ public class UserServiceImpl implements UserService {
 			User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
 			// Перевірка, що мобільний не зайнятий іншим користувачем
 			if (updateUserDto.getMobile() != null && !updateUserDto.getMobile().isBlank()) {
-				userRepository.findByMobile(updateUserDto.getMobile()).filter(other -> !other.getId().equals(user.getId()))
-						.ifPresent(other -> {
+				userRepository.findByMobile(updateUserDto.getMobile())
+						.filter(other -> !other.getId().equals(user.getId())).ifPresent(other -> {
 							throw new IllegalArgumentException("Mobile already in use");
 						});
 			}
@@ -149,7 +152,7 @@ public class UserServiceImpl implements UserService {
 			user.setUpdatedAt(Instant.now());
 			userRepository.save(user);
 
-			UpdateUserResponseDto updateUserResponseDto  = modelMapper.map(user, UpdateUserResponseDto.class);
+			UpdateUserResponseDto updateUserResponseDto = modelMapper.map(user, UpdateUserResponseDto.class);
 			return ResponseEntity.ok(updateUserResponseDto);
 		} catch (UserNotFoundException e) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -158,7 +161,39 @@ public class UserServiceImpl implements UserService {
 		} catch (Exception e) {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
 		}
-		
+
+	}
+
+	@Override
+	public ResponseEntity<?> addRole(AddRoleDto addRoleDto, Authentication authentication) {
+		try {
+			if (authentication == null || authentication.getPrincipal() == null) {
+				return ResponseEntity.status(401).body("Unauthorized");
+			}
+			Role role = Role.valueOf(addRoleDto.getRole());
+			// не дозволяємо самостійно призначати не-whitelisted ролі
+			if (role == null || !EnumSet.of(Role.ROLE_SELLER).contains(role)) {
+				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("This role cannot be self-assigned");
+			}
+			String email = (String) authentication.getPrincipal();
+			User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
+
+			if (user.getRoles() != null && user.getRoles().contains(role)) {
+				UpdateUserResponseDto updateUserResponseDto = modelMapper.map(user, UpdateUserResponseDto.class);
+				return ResponseEntity.ok(updateUserResponseDto);
+			}
+			user.getRoles().add(role);
+			user.setUpdatedAt(Instant.now());
+			userRepository.save(user);
+			UpdateUserResponseDto updateUserResponseDto = modelMapper.map(user, UpdateUserResponseDto.class);
+			return ResponseEntity.ok(updateUserResponseDto);
+		} catch (UserNotFoundException e) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+		} catch (IllegalArgumentException | NullPointerException e) {
+			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid role value");
+		} catch (Exception e) {
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
+		}
 	}
 
 }
