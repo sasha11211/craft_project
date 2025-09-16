@@ -1,15 +1,14 @@
-package com.craft.userservice.service;
+package com.craft.userservice.jwt;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
 import com.craft.userservice.configuration.JwtProperties;
-import com.craft.userservice.model.RefreshToken;
-import com.craft.userservice.repository.RefreshTokenRepository;
+import com.craft.userservice.jwt.model.RefreshToken;
+import com.craft.userservice.jwt.repository.RefreshTokenRepository;
 
 import lombok.RequiredArgsConstructor;
 

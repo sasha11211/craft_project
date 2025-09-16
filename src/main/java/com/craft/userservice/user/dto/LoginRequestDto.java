@@ -1,11 +1,11 @@
-package com.craft.userservice.dto;
+package com.craft.userservice.user.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class LoginRequest {
+public class LoginRequestDto {
 	@NotBlank
     @Email
     private String email;
