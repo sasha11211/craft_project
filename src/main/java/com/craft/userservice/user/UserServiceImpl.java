@@ -6,12 +6,12 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.modelmapper.ModelMapper;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.craft.userservice.configuration.JwtProperties;
 import com.craft.userservice.configuration.enums.Role;
 import com.craft.userservice.jwt.RefreshTokenService;
 import com.craft.userservice.jwt.dto.RefreshRequestDto;
@@ -39,6 +39,27 @@ public class UserServiceImpl implements UserService {
 	private final JwtUtil jwtUtil;
 	private final RefreshTokenService refreshTokenService;
 	private final ModelMapper modelMapper;
+	private final JwtProperties jwtProperties;
+
+	// ===== cookie helpers =====
+	private ResponseCookie buildCookie(String name, String value, long maxAgeSeconds, String path) {
+		return ResponseCookie
+				.from(name, value)
+				.httpOnly(true)
+				.secure(true) 		// в проді обов'язково HTTPS
+				.sameSite("Lax") 	// якщо інші домени -> "None" + HTTPS і CORS credentials
+				.path(path).maxAge(maxAgeSeconds).build();
+	}
+
+	private ResponseCookie clearCookie(String name, String path) {
+		return ResponseCookie.from(name, "")
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("Lax")
+				.path(path)
+				.maxAge(0)
+				.build();
+	}
 
 	@Override
 	public ResponseEntity<?> register(RegisterRequestDto registerRequestDto) {
@@ -51,9 +72,23 @@ public class UserServiceImpl implements UserService {
 				.build();
 		userRepository.save(user);
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
-		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
-		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
-		return ResponseEntity.ok(userResponseDto);
+
+		String access = jwtUtil.generateToken(user.getEmail());
+		String refresh = refreshTokenService.create(user.getId()).getToken();
+
+		long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
+        long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
+        
+        ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
+        ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
+		
+//		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
+//		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
+        
+		return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, accessC.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
+                .body(userResponseDto);
 	}
 
 	@Override
@@ -62,10 +97,25 @@ public class UserServiceImpl implements UserService {
 		if (user == null || !passwordEncoder.matches(loginRequestDto.getPassword(), user.getPassword())) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password");
 		}
+		
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
-		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
-		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
-		return ResponseEntity.ok(userResponseDto);
+		
+		String access = jwtUtil.generateToken(user.getEmail());
+		String refresh = refreshTokenService.create(user.getId()).getToken();
+
+		long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
+        long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
+        
+        ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
+        ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
+        
+//		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
+//		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
+        
+        return ResponseEntity.ok()
+				.header(HttpHeaders.SET_COOKIE, accessC.toString())
+                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
+                .body(userResponseDto);
 
 	}
 

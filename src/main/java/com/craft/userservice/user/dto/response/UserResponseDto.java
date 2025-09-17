@@ -24,7 +24,7 @@ public class UserResponseDto {
 	private Set<Role> roles;
 	private Instant createdAt;
 	private Instant updatedAt;
-	private String accessToken;
-	private String refreshToken;
+//	private String accessToken;
+//	private String refreshToken;
 
 }
