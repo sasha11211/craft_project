@@ -43,22 +43,13 @@ public class UserServiceImpl implements UserService {
 
 	// ===== cookie helpers =====
 	private ResponseCookie buildCookie(String name, String value, long maxAgeSeconds, String path) {
-		return ResponseCookie
-				.from(name, value)
-				.httpOnly(true)
-				.secure(true) 		// в проді обов'язково HTTPS
-				.sameSite("Lax") 	// якщо інші домени -> "None" + HTTPS і CORS credentials
+		return ResponseCookie.from(name, value).httpOnly(true).secure(true) // в проді обов'язково HTTPS
+				.sameSite("Lax") // якщо інші домени -> "None" + HTTPS і CORS credentials
 				.path(path).maxAge(maxAgeSeconds).build();
 	}
 
 	private ResponseCookie clearCookie(String name, String path) {
-		return ResponseCookie.from(name, "")
-				.httpOnly(true)
-				.secure(true)
-				.sameSite("Lax")
-				.path(path)
-				.maxAge(0)
-				.build();
+		return ResponseCookie.from(name, "").httpOnly(true).secure(true).sameSite("Lax").path(path).maxAge(0).build();
 	}
 
 	@Override
@@ -77,18 +68,16 @@ public class UserServiceImpl implements UserService {
 		String refresh = refreshTokenService.create(user.getId()).getToken();
 
 		long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
-        long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
-        
-        ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-        ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
-		
+		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
+
+		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
+
 //		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
 //		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
-        
-		return ResponseEntity.ok()
-				.header(HttpHeaders.SET_COOKIE, accessC.toString())
-                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
-                .body(userResponseDto);
+
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
+				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
 	}
 
 	@Override
@@ -97,40 +86,48 @@ public class UserServiceImpl implements UserService {
 		if (user == null || !passwordEncoder.matches(loginRequestDto.getPassword(), user.getPassword())) {
 			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid email or password");
 		}
-		
+
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
-		
+
 		String access = jwtUtil.generateToken(user.getEmail());
 		String refresh = refreshTokenService.create(user.getId()).getToken();
 
 		long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
-        long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
-        
-        ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-        ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
-        
+		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
+
+		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
+
 //		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
 //		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
-        
-        return ResponseEntity.ok()
-				.header(HttpHeaders.SET_COOKIE, accessC.toString())
-                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
-                .body(userResponseDto);
+
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
+				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
 
 	}
 
 	// ротація refresh + новий access
 	@Override
-	public ResponseEntity<?> refreshToken(RefreshRequestDto refreshRequestDto) {
+	public ResponseEntity<?> refreshToken(String oldRefresh) {
 		try {
+			if (oldRefresh == null || oldRefresh.isBlank()) {
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Refresh token is required");
+			}
 
-			RefreshToken newRefresh = refreshTokenService.rotate(refreshRequestDto.getRefreshToken());
+			RefreshToken newRefresh = refreshTokenService.rotate(oldRefresh);
 
 			User user = userRepository.findById(newRefresh.getUserId())
 					.orElseThrow(() -> new UserNotFoundExceptionById(newRefresh.getUserId()));
 
 			String newAccessToken = jwtUtil.generateToken(user.getEmail());
-			return ResponseEntity.ok(new AuthResponseDto(newAccessToken, newRefresh.getToken()));
+			long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
+			long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
+			ResponseCookie accessC = buildCookie("access_token", newAccessToken, accessAge, "/");
+			ResponseCookie refreshC = buildCookie("refresh_token", newRefresh.getToken(), refreshAge, "/");
+			return ResponseEntity.ok()
+	                .header(HttpHeaders.SET_COOKIE, accessC.toString())
+	                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
+	                .body("Token refreshed");
 
 		} catch (UserNotFoundExceptionById e) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -149,7 +146,10 @@ public class UserServiceImpl implements UserService {
 		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
 
 		refreshTokenService.revokeByToken(refreshRequestDto.getRefreshToken(), user.getId());
-		return ResponseEntity.ok("Logged out from current device");
+		return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
+                .header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
+                .body("Logged out from current device");
 	}
 
 	@Override
@@ -161,7 +161,11 @@ public class UserServiceImpl implements UserService {
 		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
 
 		refreshTokenService.revokeAllByUserId(user.getId());
-		return ResponseEntity.ok("Logged out from all devices");
+		
+		return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
+                .header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
+                .body("Logged out from all devices");
 	}
 
 	@Override

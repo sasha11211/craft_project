@@ -2,6 +2,7 @@ package com.craft.userservice.user;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -35,8 +36,8 @@ public class UserController {
 	}
 
 	@PostMapping("/refresh")
-	public ResponseEntity<?> refresh(@RequestBody RefreshRequestDto refreshRequestDto) {
-		return userService.refreshToken(refreshRequestDto);
+	public ResponseEntity<?> refresh(@CookieValue(name = "refresh_token", required = false) String oldRefresh) {
+		return userService.refreshToken(oldRefresh);
 	}
 
 	@PostMapping("/logout")
