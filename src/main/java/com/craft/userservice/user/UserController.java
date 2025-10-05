@@ -41,8 +41,8 @@ public class UserController {
 	}
 
 	@PostMapping("/logout")
-	public ResponseEntity<?> logout(@RequestBody RefreshRequestDto refreshRequestDto, Authentication authentication) {
-		return userService.logout(refreshRequestDto, authentication);
+	public ResponseEntity<?> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken, Authentication authentication) {
+		return userService.logout(refreshToken, authentication);
 	}
 
 	@PostMapping("/logout-all")

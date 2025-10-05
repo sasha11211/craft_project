@@ -16,7 +16,7 @@ public interface UserService {
 	
 	public ResponseEntity<?> refreshToken(String oldRefresh);
 	
-	public ResponseEntity<?> logout(RefreshRequestDto refreshRequestDto, Authentication authentication);
+	public ResponseEntity<?> logout(String refreshToken, Authentication authentication);
 	
 	public ResponseEntity<?> logoutAll(Authentication authentication);
 	

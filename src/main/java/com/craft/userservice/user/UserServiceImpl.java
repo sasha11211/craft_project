@@ -138,14 +138,18 @@ public class UserServiceImpl implements UserService {
 	}
 
 	@Override
-	public ResponseEntity<?> logout(RefreshRequestDto refreshRequestDto, Authentication authentication) {
+	public ResponseEntity<?> logout(String refreshToken, Authentication authentication) {
 		if (authentication == null || authentication.getPrincipal() == null) {
 			return ResponseEntity.status(401).body("Unauthorized");
 		}
 		String email = (String) authentication.getPrincipal();
 		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
+		
+		if (refreshToken == null || refreshToken.isBlank()) {
+	        return ResponseEntity.badRequest().body("Refresh token missing");
+	    }
 
-		refreshTokenService.revokeByToken(refreshRequestDto.getRefreshToken(), user.getId());
+		refreshTokenService.revokeByToken(refreshToken, user.getId());
 		return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
                 .header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
