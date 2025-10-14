@@ -11,25 +11,25 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.craft.userservice.security.JwtAuthFilter;
+import com.craft.userservice.security.JwtCookieAuthFilter;
 
 @Configuration
 public class SecurityConfig {
-	private final JwtAuthFilter jwtAuthFilter;
+	private final JwtCookieAuthFilter cookieAuthFilter;
 
-	public SecurityConfig(JwtAuthFilter jwtAuthFilter) {
-		this.jwtAuthFilter = jwtAuthFilter;
+	public SecurityConfig(JwtCookieAuthFilter cookieAuthFilter) {
+		this.cookieAuthFilter = cookieAuthFilter;
 	}
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http.csrf(csrf -> csrf.disable())
 				.authorizeHttpRequests(
-						reg -> reg.requestMatchers("/api/user/register", "/api/user/login", "/api/user/refresh")
+						reg -> reg.requestMatchers("/api/user/auth/register", "/api/user/auth/login", "/api/user/auth/refresh")
 								.permitAll().anyRequest().authenticated())
 				.httpBasic(Customizer.withDefaults());
 
-		http.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+		http.addFilterBefore(cookieAuthFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
 	}
 
