@@ -32,11 +32,13 @@ public class User {
 	private Set<Role> roles = new HashSet<>();
 	private String firstName;
 	private String lastName;
+	@Indexed(unique = true, sparse = true)
+	private String login;
 	private Gender gender;
 	@Indexed(unique = true, sparse = true)
 	private String mobile;
 	private String avatarUrl;
-
+	private Address address;
 	private Instant createdAt;
 	private Instant updatedAt;
 
