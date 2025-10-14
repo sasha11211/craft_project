@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.craft.userservice.jwt.dto.RefreshRequestDto;
 import com.craft.userservice.user.dto.AddRoleDto;
 import com.craft.userservice.user.dto.LoginRequestDto;
 import com.craft.userservice.user.dto.RegisterRequestDto;
@@ -25,27 +24,27 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 	private final UserServiceImpl userService;
 
-	@PostMapping("/register")
+	@PostMapping("/auth/register")
 	public ResponseEntity<?> register(@RequestBody RegisterRequestDto registerRequestDto) {
 		return userService.register(registerRequestDto);
 	}
 
-	@PostMapping("/login")
+	@PostMapping("/auth/login")
 	public ResponseEntity<?> login(@RequestBody LoginRequestDto loginRequestDto) {
 		return userService.login(loginRequestDto);
 	}
 
-	@PostMapping("/refresh")
+	@PostMapping("/auth/refresh")
 	public ResponseEntity<?> refresh(@CookieValue(name = "refresh_token", required = false) String oldRefresh) {
 		return userService.refreshToken(oldRefresh);
 	}
 
-	@PostMapping("/logout")
+	@PostMapping("/auth/logout")
 	public ResponseEntity<?> logout(@CookieValue(name = "refresh_token", required = false) String refreshToken, Authentication authentication) {
 		return userService.logout(refreshToken, authentication);
 	}
 
-	@PostMapping("/logout-all")
+	@PostMapping("/auth/logout-all")
 	public ResponseEntity<?> logoutAll(Authentication authentication) {
 		return userService.logoutAll(authentication);
 	}

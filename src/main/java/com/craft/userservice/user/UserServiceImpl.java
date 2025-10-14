@@ -6,7 +6,10 @@ import java.util.HashSet;
 import java.util.Set;
 
 import org.modelmapper.ModelMapper;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,7 +17,6 @@ import org.springframework.stereotype.Service;
 import com.craft.userservice.configuration.JwtProperties;
 import com.craft.userservice.configuration.enums.Role;
 import com.craft.userservice.jwt.RefreshTokenService;
-import com.craft.userservice.jwt.dto.RefreshRequestDto;
 import com.craft.userservice.jwt.model.RefreshToken;
 import com.craft.userservice.security.JwtUtil;
 import com.craft.userservice.user.dto.AddRoleDto;
@@ -23,9 +25,9 @@ import com.craft.userservice.user.dto.RegisterRequestDto;
 import com.craft.userservice.user.dto.UpdateUserDto;
 import com.craft.userservice.user.dto.exceptions.UserNotFoundException;
 import com.craft.userservice.user.dto.exceptions.UserNotFoundExceptionById;
-import com.craft.userservice.user.dto.response.AuthResponseDto;
 import com.craft.userservice.user.dto.response.UpdateUserResponseDto;
 import com.craft.userservice.user.dto.response.UserResponseDto;
+import com.craft.userservice.user.model.Address;
 import com.craft.userservice.user.model.User;
 import com.craft.userservice.user.repository.UserRepository;
 
@@ -61,6 +63,13 @@ public class UserServiceImpl implements UserService {
 		User user = User.builder().email(email).password(passwordEncoder.encode(registerRequestDto.getPassword()))
 				.roles(new HashSet<>(Set.of(Role.ROLE_CUSTOMER))).createdAt(Instant.now()).updatedAt(Instant.now())
 				.build();
+		if (registerRequestDto.getFirstName() != null && !registerRequestDto.getFirstName().isBlank()) {
+			user.setFirstName(registerRequestDto.getFirstName());
+		}
+		if (registerRequestDto.getLastName() != null && !registerRequestDto.getLastName().isBlank()) {
+			user.setLastName(registerRequestDto.getLastName());
+		}
+
 		userRepository.save(user);
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
 
@@ -71,10 +80,7 @@ public class UserServiceImpl implements UserService {
 		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 
 		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
-
-//		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
-//		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/api/user/auth");
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
 				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
@@ -96,10 +102,7 @@ public class UserServiceImpl implements UserService {
 		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 
 		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
-
-//		userResponseDto.setAccessToken(jwtUtil.generateToken(user.getEmail()));
-//		userResponseDto.setRefreshToken(refreshTokenService.create(user.getId()).getToken());
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/api/user/auth");
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
 				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
@@ -123,11 +126,9 @@ public class UserServiceImpl implements UserService {
 			long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
 			long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 			ResponseCookie accessC = buildCookie("access_token", newAccessToken, accessAge, "/");
-			ResponseCookie refreshC = buildCookie("refresh_token", newRefresh.getToken(), refreshAge, "/");
-			return ResponseEntity.ok()
-	                .header(HttpHeaders.SET_COOKIE, accessC.toString())
-	                .header(HttpHeaders.SET_COOKIE, refreshC.toString())
-	                .body("Token refreshed");
+			ResponseCookie refreshC = buildCookie("refresh_token", newRefresh.getToken(), refreshAge, "/api/user/auth");
+			return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
+					.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body("Token refreshed");
 
 		} catch (UserNotFoundExceptionById e) {
 			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
@@ -144,16 +145,15 @@ public class UserServiceImpl implements UserService {
 		}
 		String email = (String) authentication.getPrincipal();
 		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
-		
+
 		if (refreshToken == null || refreshToken.isBlank()) {
-	        return ResponseEntity.badRequest().body("Refresh token missing");
-	    }
+			return ResponseEntity.badRequest().body("Refresh token missing");
+		}
 
 		refreshTokenService.revokeByToken(refreshToken, user.getId());
-		return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
-                .header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
-                .body("Logged out from current device");
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
+				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/api/user/auth").toString())
+				.body("Logged out from current device");
 	}
 
 	@Override
@@ -165,11 +165,10 @@ public class UserServiceImpl implements UserService {
 		User user = userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("User not found"));
 
 		refreshTokenService.revokeAllByUserId(user.getId());
-		
-		return ResponseEntity.ok()
-                .header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
-                .header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
-                .body("Logged out from all devices");
+
+		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
+				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/api/user/auth").toString())
+				.body("Logged out from all devices");
 	}
 
 	@Override
@@ -205,6 +204,20 @@ public class UserServiceImpl implements UserService {
 							throw new IllegalArgumentException("Mobile already in use");
 						});
 			}
+			// перевірка унікальності логіна
+			if (updateUserDto.getLogin() != null && !updateUserDto.getLogin().isBlank()) {
+				userRepository.findByLogin(updateUserDto.getLogin())
+						.filter(other -> !other.getId().equals(user.getId())).ifPresent(other -> {
+							throw new IllegalArgumentException("Login already in use");
+						});
+				user.setLogin(updateUserDto.getLogin());
+			}
+			// адреса
+	        if (updateUserDto.getAddress() != null) {
+	            Address address = modelMapper.map(updateUserDto.getAddress(), Address.class);
+	            user.setAddress(address);
+	        }
+
 			modelMapper.map(updateUserDto, user);
 			user.setUpdatedAt(Instant.now());
 			userRepository.save(user);
