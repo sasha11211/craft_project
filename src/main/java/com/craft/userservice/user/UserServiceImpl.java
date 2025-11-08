@@ -46,12 +46,12 @@ public class UserServiceImpl implements UserService {
 	// ===== cookie helpers =====
 	private ResponseCookie buildCookie(String name, String value, long maxAgeSeconds, String path) {
 		return ResponseCookie.from(name, value).httpOnly(true).secure(true) // в проді обов'язково HTTPS
-				.sameSite("Lax") // якщо інші домени -> "None" + HTTPS і CORS credentials
+				.sameSite("None")
 				.path(path).maxAge(maxAgeSeconds).build();
 	}
 
 	private ResponseCookie clearCookie(String name, String path) {
-		return ResponseCookie.from(name, "").httpOnly(true).secure(true).sameSite("Lax").path(path).maxAge(0).build();
+		return ResponseCookie.from(name, "").httpOnly(true).secure(true).sameSite("None").path(path).maxAge(0).build();
 	}
 
 	@Override
