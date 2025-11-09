@@ -80,7 +80,7 @@ public class UserServiceImpl implements UserService {
 		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 
 		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/api/user/auth");
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
 				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
@@ -102,7 +102,8 @@ public class UserServiceImpl implements UserService {
 		long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 
 		ResponseCookie accessC = buildCookie("access_token", access, accessAge, "/");
-		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/api/user/auth");
+//		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/api/user/auth");
+		ResponseCookie refreshC = buildCookie("refresh_token", refresh, refreshAge, "/");
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
 				.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body(userResponseDto);
@@ -126,7 +127,7 @@ public class UserServiceImpl implements UserService {
 			long accessAge = jwtProperties.getAccessTokenExpirationMs() / 1000;
 			long refreshAge = jwtProperties.getRefreshTokenExpirationMs() / 1000;
 			ResponseCookie accessC = buildCookie("access_token", newAccessToken, accessAge, "/");
-			ResponseCookie refreshC = buildCookie("refresh_token", newRefresh.getToken(), refreshAge, "/api/user/auth");
+			ResponseCookie refreshC = buildCookie("refresh_token", newRefresh.getToken(), refreshAge, "/");
 			return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, accessC.toString())
 					.header(HttpHeaders.SET_COOKIE, refreshC.toString()).body("Token refreshed");
 
@@ -152,7 +153,7 @@ public class UserServiceImpl implements UserService {
 
 		refreshTokenService.revokeByToken(refreshToken, user.getId());
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
-				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/api/user/auth").toString())
+				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
 				.body("Logged out from current device");
 	}
 
@@ -167,7 +168,7 @@ public class UserServiceImpl implements UserService {
 		refreshTokenService.revokeAllByUserId(user.getId());
 
 		return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, clearCookie("access_token", "/").toString())
-				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/api/user/auth").toString())
+				.header(HttpHeaders.SET_COOKIE, clearCookie("refresh_token", "/").toString())
 				.body("Logged out from all devices");
 	}
 
