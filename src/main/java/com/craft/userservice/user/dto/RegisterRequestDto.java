@@ -11,7 +11,7 @@ public class RegisterRequestDto {
     private String email;
     @NotBlank
     private String password;
-    
+    private boolean registerAsSeller;
     private String firstName;
     private String lastName;
 

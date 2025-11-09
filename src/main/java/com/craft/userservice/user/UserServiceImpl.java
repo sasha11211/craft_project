@@ -45,13 +45,25 @@ public class UserServiceImpl implements UserService {
 
 	// ===== cookie helpers =====
 	private ResponseCookie buildCookie(String name, String value, long maxAgeSeconds, String path) {
-		return ResponseCookie.from(name, value).httpOnly(true).secure(true) // в проді обов'язково HTTPS
+		return ResponseCookie
+				.from(name, value)
+				.httpOnly(true)
+				.secure(true)
 				.sameSite("None")
-				.path(path).maxAge(maxAgeSeconds).build();
+				.path(path)
+				.maxAge(maxAgeSeconds)
+				.build();
 	}
 
 	private ResponseCookie clearCookie(String name, String path) {
-		return ResponseCookie.from(name, "").httpOnly(true).secure(true).sameSite("None").path(path).maxAge(0).build();
+		return ResponseCookie
+				.from(name, "")
+				.httpOnly(true)
+				.secure(true)
+				.sameSite("None")
+				.path(path)
+				.maxAge(0)
+				.build();
 	}
 
 	@Override
@@ -60,8 +72,12 @@ public class UserServiceImpl implements UserService {
 		if (userRepository.existsByEmail(email)) {
 			return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already in use");
 		}
-		User user = User.builder().email(email).password(passwordEncoder.encode(registerRequestDto.getPassword()))
-				.roles(new HashSet<>(Set.of(Role.ROLE_CUSTOMER))).createdAt(Instant.now()).updatedAt(Instant.now())
+		User user = User.builder()
+				.email(email)
+				.password(passwordEncoder.encode(registerRequestDto.getPassword()))
+				.roles(new HashSet<>(Set.of(Role.ROLE_CUSTOMER)))
+				.createdAt(Instant.now())
+				.updatedAt(Instant.now())
 				.build();
 		if (registerRequestDto.getFirstName() != null && !registerRequestDto.getFirstName().isBlank()) {
 			user.setFirstName(registerRequestDto.getFirstName());
@@ -69,6 +85,9 @@ public class UserServiceImpl implements UserService {
 		if (registerRequestDto.getLastName() != null && !registerRequestDto.getLastName().isBlank()) {
 			user.setLastName(registerRequestDto.getLastName());
 		}
+		if (registerRequestDto.isRegisterAsSeller()) {
+			user.getRoles().add(Role.ROLE_SELLER);
+		} 
 
 		userRepository.save(user);
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
@@ -206,18 +225,18 @@ public class UserServiceImpl implements UserService {
 						});
 			}
 			// перевірка унікальності логіна
-			if (updateUserDto.getLogin() != null && !updateUserDto.getLogin().isBlank()) {
-				userRepository.findByLogin(updateUserDto.getLogin())
+			if (updateUserDto.getUserName() != null && !updateUserDto.getUserName().isBlank()) {
+				userRepository.findByUserName(updateUserDto.getUserName())
 						.filter(other -> !other.getId().equals(user.getId())).ifPresent(other -> {
-							throw new IllegalArgumentException("Login already in use");
+							throw new IllegalArgumentException("User name already in use");
 						});
-				user.setLogin(updateUserDto.getLogin());
+				user.setUserName(updateUserDto.getUserName());
 			}
 			// адреса
-	        if (updateUserDto.getAddress() != null) {
-	            Address address = modelMapper.map(updateUserDto.getAddress(), Address.class);
-	            user.setAddress(address);
-	        }
+			if (updateUserDto.getAddress() != null) {
+				Address address = modelMapper.map(updateUserDto.getAddress(), Address.class);
+				user.setAddress(address);
+			}
 
 			modelMapper.map(updateUserDto, user);
 			user.setUpdatedAt(Instant.now());

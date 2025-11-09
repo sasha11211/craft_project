@@ -7,7 +7,7 @@ import lombok.Data;
 
 @Data
 public class UpdateUserDto {
-	private String login;
+	private String userName;
 	private String firstName;           
     private String lastName;             
     private Gender gender;

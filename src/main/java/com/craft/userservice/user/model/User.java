@@ -33,7 +33,7 @@ public class User {
 	private String firstName;
 	private String lastName;
 	@Indexed(unique = true, sparse = true)
-	private String login;
+	private String userName;
 	private Gender gender;
 	@Indexed(unique = true, sparse = true)
 	private String mobile;

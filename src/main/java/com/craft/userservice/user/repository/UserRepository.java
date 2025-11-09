@@ -6,13 +6,14 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 
 import com.craft.userservice.user.model.User;
 
+
 public interface UserRepository extends MongoRepository<User, String>{
 	Optional<User> findByEmail(String email);
 	Optional<User> findByMobile(String mobile);
-	Optional<User> findByLogin(String login);
+	Optional<User> findByUserName(String userName);
 	
 	boolean existsByEmail(String emString);
 	boolean existsByMobile(String mobile);
-	boolean existsByLogin(String login);
+	boolean existsByUserName(String userName);
 
 }
