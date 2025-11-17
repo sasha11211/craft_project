@@ -1,5 +1,7 @@
 package com.craft.userservice.configuration;
 
+import java.nio.file.attribute.BasicFileAttributes;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -27,7 +29,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests(
 						reg -> reg.requestMatchers("/api/user/auth/register", "/api/user/auth/login", "/api/user/auth/refresh")
 								.permitAll().anyRequest().authenticated())
-				.httpBasic(Customizer.withDefaults());
+//				.httpBasic(Customizer.withDefaults());
+				.httpBasic(basic -> basic.disable());
 
 		http.addFilterBefore(cookieAuthFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
