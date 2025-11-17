@@ -29,8 +29,8 @@ public class SecurityConfig {
 				.authorizeHttpRequests(
 						reg -> reg.requestMatchers("/api/user/auth/register", "/api/user/auth/login", "/api/user/auth/refresh")
 								.permitAll().anyRequest().authenticated())
-//				.httpBasic(Customizer.withDefaults());
-				.httpBasic(basic -> basic.disable());
+				.httpBasic(Customizer.withDefaults());
+//				.httpBasic(basic -> basic.disable());
 
 		http.addFilterBefore(cookieAuthFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
