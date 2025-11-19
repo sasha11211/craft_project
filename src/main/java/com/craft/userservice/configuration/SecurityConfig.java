@@ -3,6 +3,7 @@ package com.craft.userservice.configuration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -24,11 +25,22 @@ public class SecurityConfig {
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		http.csrf(csrf -> csrf.disable())
-				.authorizeHttpRequests(
-						reg -> reg.requestMatchers("/api/user/auth/register", "/api/user/auth/login", "/api/user/auth/refresh")
-								.permitAll().anyRequest().authenticated())
+				.authorizeHttpRequests(reg -> reg
+						.requestMatchers("/api/user/auth/register", "/api/user/auth/login", "/api/user/auth/refresh")
+						.permitAll().anyRequest().authenticated())
+//				.httpBasic(Customizer.withDefaults());
 				.httpBasic(AbstractHttpConfigurer::disable)
-		        .formLogin(AbstractHttpConfigurer::disable);
+				.formLogin(AbstractHttpConfigurer::disable)
+				.exceptionHandling(ex -> ex.authenticationEntryPoint((req, res, e) -> {
+					res.setStatus(401);
+					res.setContentType("application/json");
+					res.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Authentication required\"}");
+				})
+				.accessDeniedHandler((req, res, e) -> {
+					res.setStatus(403);
+					res.setContentType("application/json");
+					res.getWriter().write("{\"error\":\"FORBIDDEN\",\"message\":\"Access denied\"}");
+				}));
 
 		http.addFilterBefore(cookieAuthFilter, UsernamePasswordAuthenticationFilter.class);
 		return http.build();
