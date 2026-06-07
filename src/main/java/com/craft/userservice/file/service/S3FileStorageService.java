@@ -1,6 +1,7 @@
 package com.craft.userservice.file.service;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -48,7 +49,7 @@ public class S3FileStorageService implements FileStorageService {
         String s3Key = buildS3Key(uploadedByUserId, originalFilename);
         String bucket = s3Properties.getBucket();
 
-        try {
+        try (InputStream inputStream = file.getInputStream()) {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucket)
                     .key(s3Key)
@@ -56,7 +57,7 @@ public class S3FileStorageService implements FileStorageService {
                     .contentLength(file.getSize())
                     .build();
 
-            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
+            s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(inputStream, file.getSize()));
         } catch (IOException | S3Exception | SdkClientException ex) {
             throw new FileStorageException("Could not upload file. Please try again later.", ex);
         }
