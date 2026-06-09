@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.craft.userservice.file.dto.FileDownloadUrlResponseDto;
 import com.craft.userservice.file.dto.FileMetadataResponseDto;
+import com.craft.userservice.file.enums.FileStorageStatus;
 import com.craft.userservice.file.exception.FileStorageException;
 import com.craft.userservice.file.model.FileMetadata;
 import com.craft.userservice.file.repository.FileMetadataRepository;
@@ -80,6 +82,7 @@ public class FileController {
         List<FileMetadataResponseDto> files = fileMetadataRepository
                 .findByUploadedByUserIdOrderByCreatedAtDesc(user.getId())
                 .stream()
+                .filter(metadata -> metadata.getStatus() != FileStorageStatus.DELETED)
                 .map(this::toResponseDto)
                 .toList();
 
@@ -99,7 +102,7 @@ public class FileController {
         }
 
         FileMetadata metadata = fileMetadataRepository.findById(id).orElse(null);
-        if (metadata == null) {
+        if (metadata == null || metadata.getStatus() == FileStorageStatus.DELETED) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found");
         }
 
@@ -131,6 +134,36 @@ public class FileController {
                     .build());
         } catch (SdkClientException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Could not generate download URL");
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteFile(@PathVariable String id, Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        String email = (String) authentication.getPrincipal();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        FileMetadata metadata = fileMetadataRepository.findById(id).orElse(null);
+        if (metadata == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found");
+        }
+
+        if (!user.getId().equals(metadata.getUploadedByUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Forbidden");
+        }
+
+        try {
+            fileStorageService.deleteFile(metadata);
+            return ResponseEntity.noContent().build();
+        } catch (FileStorageException e) {
+            HttpStatus status = isStorageFailure(e) ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(e.getMessage());
         }
     }
 
