@@ -21,6 +21,7 @@ import com.craft.userservice.file.repository.FileMetadataRepository;
 import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
@@ -78,6 +79,32 @@ public class S3FileStorageService implements FileStorageService {
 
         FileMetadata savedMetadata = fileMetadataRepository.save(metadata);
         return toResponseDto(savedMetadata);
+    }
+
+    @Override
+    public void deleteFile(FileMetadata metadata) {
+        if (metadata == null) {
+            throw new FileStorageException("File metadata is required.");
+        }
+
+        if (!StringUtils.hasText(metadata.getBucket()) || !StringUtils.hasText(metadata.getS3Key())) {
+            throw new FileStorageException("File storage metadata is incomplete.");
+        }
+
+        try {
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(metadata.getBucket())
+                    .key(metadata.getS3Key())
+                    .build();
+
+            s3Client.deleteObject(deleteObjectRequest);
+        } catch (S3Exception | SdkClientException ex) {
+            throw new FileStorageException("Could not delete file. Please try again later.", ex);
+        }
+
+        metadata.setStatus(FileStorageStatus.DELETED);
+        metadata.setUpdatedAt(Instant.now());
+        fileMetadataRepository.save(metadata);
     }
 
     private void validateUploadRequest(MultipartFile file, String uploadedByUserId) {
