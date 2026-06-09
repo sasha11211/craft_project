@@ -7,6 +7,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -14,13 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
-
-import com.craft.userservice.file.configuration.S3Properties;
-import com.craft.userservice.file.dto.FileMetadataResponseDto;
-import com.craft.userservice.file.enums.FileStorageStatus;
-import com.craft.userservice.file.exception.FileStorageException;
-import com.craft.userservice.file.model.FileMetadata;
-import com.craft.userservice.file.repository.FileMetadataRepository;
+import org.springframework.web.multipart.MultipartFile;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
@@ -42,59 +40,62 @@ class S3FileStorageServiceTest {
     @Mock
     private S3Client s3Client;
 
-    @Mock
-    private FileMetadataRepository fileMetadataRepository;
-
-    private S3FileStorageService service;
+    private Object fileMetadataRepository;
+    private Object service;
 
     @BeforeEach
-    void setUp() {
-        S3Properties s3Properties = new S3Properties();
-        s3Properties.setBucket(BUCKET);
-        s3Properties.setPublicBaseUrl(PUBLIC_BASE_URL);
-        s3Properties.setMaxFileSizeMb(1);
+    void setUp() throws Exception {
+        Object s3Properties = newInstance("com.craft.userservice.file.configuration.S3Properties");
+        invoke(s3Properties, "setBucket", String.class, BUCKET);
+        invoke(s3Properties, "setPublicBaseUrl", String.class, PUBLIC_BASE_URL);
+        invoke(s3Properties, "setMaxFileSizeMb", long.class, 1L);
 
-        service = new S3FileStorageService(s3Client, s3Properties, fileMetadataRepository);
+        Class<?> repositoryClass = type("com.craft.userservice.file.repository.FileMetadataRepository");
+        fileMetadataRepository = org.mockito.Mockito.mock(repositoryClass);
+
+        Constructor<?> constructor = type("com.craft.userservice.file.service.S3FileStorageService")
+                .getConstructor(S3Client.class, s3Properties.getClass(), repositoryClass);
+        service = constructor.newInstance(s3Client, s3Properties, fileMetadataRepository);
     }
 
     @Test
-    void uploadFile_whenFileIsEmpty_fails() {
+    void uploadFile_whenFileIsEmpty_fails() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "empty.png",
                 "image/png",
                 new byte[0]);
 
-        assertThatThrownBy(() -> service.uploadFile(file, USER_ID))
-                .isInstanceOf(FileStorageException.class)
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
                 .hasMessage("File must not be empty.");
 
         verifyNoInteractions(s3Client, fileMetadataRepository);
     }
 
     @Test
-    void uploadFile_whenFileIsOversized_fails() {
+    void uploadFile_whenFileIsOversized_fails() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
                 "large.png",
                 "image/png",
                 new byte[(1024 * 1024) + 1]);
 
-        assertThatThrownBy(() -> service.uploadFile(file, USER_ID))
-                .isInstanceOf(FileStorageException.class)
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
                 .hasMessage("File size exceeds the configured maximum.");
 
         verifyNoInteractions(s3Client, fileMetadataRepository);
     }
 
     @Test
-    void uploadFile_whenValid_callsS3PutObject() {
+    void uploadFile_whenValid_callsS3PutObject() throws Throwable {
         MockMultipartFile file = validFile();
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
-        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        whenSaveReturnsFirstArgument();
 
-        service.uploadFile(file, USER_ID);
+        uploadFile(file);
 
         ArgumentCaptor<PutObjectRequest> requestCaptor = ArgumentCaptor.forClass(PutObjectRequest.class);
         verify(s3Client).putObject(requestCaptor.capture(), any(RequestBody.class));
@@ -108,63 +109,59 @@ class S3FileStorageServiceTest {
     }
 
     @Test
-    void uploadFile_whenValid_savesFileMetadata() {
+    void uploadFile_whenValid_savesFileMetadata() throws Throwable {
         MockMultipartFile file = validFile();
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
-        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        whenSaveReturnsFirstArgument();
 
-        service.uploadFile(file, USER_ID);
+        uploadFile(file);
 
-        ArgumentCaptor<FileMetadata> metadataCaptor = ArgumentCaptor.forClass(FileMetadata.class);
-        verify(fileMetadataRepository).save(metadataCaptor.capture());
+        ArgumentCaptor<Object> metadataCaptor = ArgumentCaptor.forClass(Object.class);
+        verifySave(metadataCaptor);
 
-        FileMetadata metadata = metadataCaptor.getValue();
-        assertThat(metadata.getUploadedByUserId()).isEqualTo(USER_ID);
-        assertThat(metadata.getOriginalFilename()).isEqualTo("photo.png");
-        assertThat(metadata.getContentType()).isEqualTo("image/png");
-        assertThat(metadata.getSize()).isEqualTo(file.getSize());
-        assertThat(metadata.getBucket()).isEqualTo(BUCKET);
-        assertThat(metadata.getS3Key()).startsWith("users/user-123/uploads/");
-        assertThat(metadata.getPublicUrl()).isEqualTo(PUBLIC_BASE_URL + "/" + metadata.getS3Key());
-        assertThat(metadata.getStatus()).isEqualTo(FileStorageStatus.UPLOADED);
-        assertThat(metadata.getCreatedAt()).isNotNull();
-        assertThat(metadata.getUpdatedAt()).isNotNull();
+        Object metadata = metadataCaptor.getValue();
+        assertThat(get(metadata, "getUploadedByUserId")).isEqualTo(USER_ID);
+        assertThat(get(metadata, "getOriginalFilename")).isEqualTo("photo.png");
+        assertThat(get(metadata, "getContentType")).isEqualTo("image/png");
+        assertThat(get(metadata, "getSize")).isEqualTo(file.getSize());
+        assertThat(get(metadata, "getBucket")).isEqualTo(BUCKET);
+        assertThat(get(metadata, "getS3Key").toString()).startsWith("users/user-123/uploads/");
+        assertThat(get(metadata, "getPublicUrl")).isEqualTo(PUBLIC_BASE_URL + "/" + get(metadata, "getS3Key"));
+        assertThat(get(metadata, "getStatus").toString()).isEqualTo("UPLOADED");
+        assertThat(get(metadata, "getCreatedAt")).isNotNull();
+        assertThat(get(metadata, "getUpdatedAt")).isNotNull();
     }
 
     @Test
-    void uploadFile_whenValid_returnsResponseDto() {
+    void uploadFile_whenValid_returnsResponseDto() throws Throwable {
         MockMultipartFile file = validFile();
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
                 .thenReturn(PutObjectResponse.builder().build());
-        when(fileMetadataRepository.save(any(FileMetadata.class))).thenAnswer(invocation -> {
-            FileMetadata metadata = invocation.getArgument(0);
-            metadata.setId("file-123");
-            return metadata;
-        });
+        whenSaveSetsIdAndReturnsMetadata("file-123");
 
-        FileMetadataResponseDto response = service.uploadFile(file, USER_ID);
+        Object response = uploadFile(file);
 
-        assertThat(response.getId()).isEqualTo("file-123");
-        assertThat(response.getUploadedByUserId()).isEqualTo(USER_ID);
-        assertThat(response.getOriginalFilename()).isEqualTo("photo.png");
-        assertThat(response.getContentType()).isEqualTo("image/png");
-        assertThat(response.getSize()).isEqualTo(file.getSize());
-        assertThat(response.getBucket()).isEqualTo(BUCKET);
-        assertThat(response.getS3Key()).startsWith("users/user-123/uploads/");
-        assertThat(response.getPublicUrl()).isEqualTo(PUBLIC_BASE_URL + "/" + response.getS3Key());
-        assertThat(response.getStatus()).isEqualTo(FileStorageStatus.UPLOADED);
-        assertThat(response.getCreatedAt()).isNotNull();
-        assertThat(response.getUpdatedAt()).isNotNull();
+        assertThat(get(response, "getId")).isEqualTo("file-123");
+        assertThat(get(response, "getUploadedByUserId")).isEqualTo(USER_ID);
+        assertThat(get(response, "getOriginalFilename")).isEqualTo("photo.png");
+        assertThat(get(response, "getContentType")).isEqualTo("image/png");
+        assertThat(get(response, "getSize")).isEqualTo(file.getSize());
+        assertThat(get(response, "getBucket")).isEqualTo(BUCKET);
+        assertThat(get(response, "getS3Key").toString()).startsWith("users/user-123/uploads/");
+        assertThat(get(response, "getPublicUrl")).isEqualTo(PUBLIC_BASE_URL + "/" + get(response, "getS3Key"));
+        assertThat(get(response, "getStatus").toString()).isEqualTo("UPLOADED");
+        assertThat(get(response, "getCreatedAt")).isNotNull();
+        assertThat(get(response, "getUpdatedAt")).isNotNull();
     }
 
     @Test
-    void deleteFile_whenMetadataIsValid_callsS3DeleteObject() {
-        FileMetadata metadata = storedMetadata();
+    void deleteFile_whenMetadataIsValid_callsS3DeleteObject() throws Throwable {
+        Object metadata = storedMetadata();
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
                 .thenReturn(DeleteObjectResponse.builder().build());
 
-        service.deleteFile(metadata);
+        deleteFile(metadata);
 
         ArgumentCaptor<DeleteObjectRequest> requestCaptor = ArgumentCaptor.forClass(DeleteObjectRequest.class);
         verify(s3Client).deleteObject(requestCaptor.capture());
@@ -175,29 +172,72 @@ class S3FileStorageServiceTest {
     }
 
     @Test
-    void deleteFile_whenMetadataIsValid_marksMetadataAsDeleted() {
-        FileMetadata metadata = storedMetadata();
+    void deleteFile_whenMetadataIsValid_marksMetadataAsDeleted() throws Throwable {
+        Object metadata = storedMetadata();
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
                 .thenReturn(DeleteObjectResponse.builder().build());
 
-        service.deleteFile(metadata);
+        deleteFile(metadata);
 
-        assertThat(metadata.getStatus()).isEqualTo(FileStorageStatus.DELETED);
-        assertThat(metadata.getUpdatedAt()).isNotNull();
+        assertThat(get(metadata, "getStatus").toString()).isEqualTo("DELETED");
+        assertThat(get(metadata, "getUpdatedAt")).isNotNull();
     }
 
     @Test
-    void deleteFile_whenMetadataIsValid_savesUpdatedMetadata() {
-        FileMetadata metadata = storedMetadata();
+    void deleteFile_whenMetadataIsValid_savesUpdatedMetadata() throws Throwable {
+        Object metadata = storedMetadata();
         when(s3Client.deleteObject(any(DeleteObjectRequest.class)))
                 .thenReturn(DeleteObjectResponse.builder().build());
 
-        service.deleteFile(metadata);
+        deleteFile(metadata);
 
-        ArgumentCaptor<FileMetadata> metadataCaptor = ArgumentCaptor.forClass(FileMetadata.class);
-        verify(fileMetadataRepository).save(metadataCaptor.capture());
+        ArgumentCaptor<Object> metadataCaptor = ArgumentCaptor.forClass(Object.class);
+        verifySave(metadataCaptor);
         assertThat(metadataCaptor.getValue()).isSameAs(metadata);
-        assertThat(metadataCaptor.getValue().getStatus()).isEqualTo(FileStorageStatus.DELETED);
+        assertThat(get(metadataCaptor.getValue(), "getStatus").toString()).isEqualTo("DELETED");
+    }
+
+    private Object uploadFile(MultipartFile file) throws Throwable {
+        return invokeService("uploadFile", new Class<?>[] { MultipartFile.class, String.class }, file, USER_ID);
+    }
+
+    private void deleteFile(Object metadata) throws Throwable {
+        invokeService("deleteFile", new Class<?>[] { type("com.craft.userservice.file.model.FileMetadata") }, metadata);
+    }
+
+    private Object invokeService(String methodName, Class<?>[] parameterTypes, Object... args) throws Throwable {
+        try {
+            Method method = service.getClass().getMethod(methodName, parameterTypes);
+            return method.invoke(service, args);
+        } catch (InvocationTargetException ex) {
+            throw ex.getTargetException();
+        }
+    }
+
+    private void whenSaveReturnsFirstArgument() throws Exception {
+        when(repositorySave(any(type("com.craft.userservice.file.model.FileMetadata"))))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+    }
+
+    private void whenSaveSetsIdAndReturnsMetadata(String id) throws Exception {
+        when(repositorySave(any(type("com.craft.userservice.file.model.FileMetadata"))))
+                .thenAnswer(invocation -> {
+                    Object metadata = invocation.getArgument(0);
+                    invoke(metadata, "setId", String.class, id);
+                    return metadata;
+                });
+    }
+
+    private Object repositorySave(Object metadata) throws Exception {
+        return type("com.craft.userservice.file.repository.FileMetadataRepository")
+                .getMethod("save", Object.class)
+                .invoke(fileMetadataRepository, metadata);
+    }
+
+    private void verifySave(ArgumentCaptor<Object> metadataCaptor) throws Exception {
+        type("com.craft.userservice.file.repository.FileMetadataRepository")
+                .getMethod("save", Object.class)
+                .invoke(verify(fileMetadataRepository), metadataCaptor.capture());
     }
 
     private MockMultipartFile validFile() {
@@ -208,16 +248,46 @@ class S3FileStorageServiceTest {
                 "image bytes".getBytes());
     }
 
-    private FileMetadata storedMetadata() {
-        return FileMetadata.builder()
-                .id("file-123")
-                .uploadedByUserId(USER_ID)
-                .originalFilename("photo.png")
-                .contentType("image/png")
-                .size(11L)
-                .bucket(BUCKET)
-                .s3Key("users/user-123/uploads/2026/06/file-photo.png")
-                .status(FileStorageStatus.UPLOADED)
-                .build();
+    private Object storedMetadata() throws Exception {
+        Object metadata = newInstance("com.craft.userservice.file.model.FileMetadata");
+        invoke(metadata, "setId", String.class, "file-123");
+        invoke(metadata, "setUploadedByUserId", String.class, USER_ID);
+        invoke(metadata, "setOriginalFilename", String.class, "photo.png");
+        invoke(metadata, "setContentType", String.class, "image/png");
+        invoke(metadata, "setSize", Long.class, 11L);
+        invoke(metadata, "setBucket", String.class, BUCKET);
+        invoke(metadata, "setS3Key", String.class, "users/user-123/uploads/2026/06/file-photo.png");
+        invoke(metadata, "setStatus", type("com.craft.userservice.file.enums.FileStorageStatus"), status("UPLOADED"));
+        return metadata;
+    }
+
+    private Object status(String name) throws Exception {
+        return Enum.valueOf(enumType("com.craft.userservice.file.enums.FileStorageStatus"), name);
+    }
+
+    private Object get(Object target, String methodName) throws Exception {
+        return target.getClass().getMethod(methodName).invoke(target);
+    }
+
+    private void invoke(Object target, String methodName, Class<?> parameterType, Object value) throws Exception {
+        target.getClass().getMethod(methodName, parameterType).invoke(target, value);
+    }
+
+    private Object newInstance(String className) throws Exception {
+        return type(className).getConstructor().newInstance();
+    }
+
+    private Class<?> type(String className) throws ClassNotFoundException {
+        return Class.forName(className);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Class<? extends RuntimeException> runtimeException(String className) throws ClassNotFoundException {
+        return (Class<? extends RuntimeException>) type(className);
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private Class<? extends Enum> enumType(String className) throws ClassNotFoundException {
+        return (Class<? extends Enum>) type(className);
     }
 }
