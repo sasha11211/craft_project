@@ -1,6 +1,7 @@
 package com.craft.userservice.file.controller;
 
 import java.time.Duration;
+import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -64,6 +65,27 @@ public class FileController {
         }
     }
 
+    @GetMapping("/my")
+    public ResponseEntity<?> getMyFiles(Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        String email = (String) authentication.getPrincipal();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        List<FileMetadataResponseDto> files = fileMetadataRepository
+                .findByUploadedByUserIdOrderByCreatedAtDesc(user.getId())
+                .stream()
+                .map(this::toResponseDto)
+                .toList();
+
+        return ResponseEntity.ok(files);
+    }
+
     @GetMapping("/{id}/download-url")
     public ResponseEntity<?> getDownloadUrl(@PathVariable String id, Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -110,6 +132,22 @@ public class FileController {
         } catch (SdkClientException e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Could not generate download URL");
         }
+    }
+
+    private FileMetadataResponseDto toResponseDto(FileMetadata metadata) {
+        return FileMetadataResponseDto.builder()
+                .id(metadata.getId())
+                .uploadedByUserId(metadata.getUploadedByUserId())
+                .originalFilename(metadata.getOriginalFilename())
+                .contentType(metadata.getContentType())
+                .size(metadata.getSize())
+                .bucket(metadata.getBucket())
+                .s3Key(metadata.getS3Key())
+                .publicUrl(metadata.getPublicUrl())
+                .status(metadata.getStatus())
+                .createdAt(metadata.getCreatedAt())
+                .updatedAt(metadata.getUpdatedAt())
+                .build();
     }
 
     private boolean isStorageFailure(FileStorageException exception) {
