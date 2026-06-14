@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -28,6 +29,11 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 @Service
 public class S3FileStorageService implements FileStorageService {
     private static final long BYTES_PER_MB = 1024L * 1024L;
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp",
+            "application/pdf");
 
     private final S3Client s3Client;
     private final S3Properties s3Properties;
@@ -127,6 +133,15 @@ public class S3FileStorageService implements FileStorageService {
 
         if (file.getSize() > maxFileSizeBytes) {
             throw new FileStorageException("File size exceeds the configured maximum.");
+        }
+
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType)) {
+            throw new FileStorageException("File content type is required.");
+        }
+
+        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+            throw new FileStorageException("File content type is not supported.");
         }
     }
 
