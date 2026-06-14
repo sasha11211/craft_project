@@ -27,10 +27,6 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
-/**
- * Service-layer tests only. TODO: add content-type validation tests when
- * S3FileStorageService validates allowed content types.
- */
 @ExtendWith(MockitoExtension.class)
 class S3FileStorageServiceTest {
     private static final String BUCKET = "test-bucket";
@@ -84,6 +80,36 @@ class S3FileStorageServiceTest {
         assertThatThrownBy(() -> uploadFile(file))
                 .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
                 .hasMessage("File size exceeds the configured maximum.");
+
+        verifyNoInteractions(s3Client, fileMetadataRepository);
+    }
+
+    @Test
+    void uploadFile_whenContentTypeIsUnsupported_fails() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "notes.txt",
+                "text/plain",
+                "not allowed".getBytes());
+
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
+                .hasMessage("File content type is not supported.");
+
+        verifyNoInteractions(s3Client, fileMetadataRepository);
+    }
+
+    @Test
+    void uploadFile_whenContentTypeIsMissing_fails() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "photo.png",
+                null,
+                "image bytes".getBytes());
+
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
+                .hasMessage("File content type is required.");
 
         verifyNoInteractions(s3Client, fileMetadataRepository);
     }
