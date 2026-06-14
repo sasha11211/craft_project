@@ -89,6 +89,30 @@ public class FileController {
         return ResponseEntity.ok(files);
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getFileMetadata(@PathVariable String id, Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        String email = (String) authentication.getPrincipal();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        FileMetadata metadata = fileMetadataRepository.findById(id).orElse(null);
+        if (metadata == null || metadata.getStatus() == FileStorageStatus.DELETED) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found");
+        }
+
+        if (!user.getId().equals(metadata.getUploadedByUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Forbidden");
+        }
+
+        return ResponseEntity.ok(toResponseDto(metadata));
+    }
+
     @GetMapping("/{id}/download-url")
     public ResponseEntity<?> getDownloadUrl(@PathVariable String id, Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
