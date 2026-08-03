@@ -1,4 +1,4 @@
-package com.craft.users_service;
+package com.craft.userservice;
 
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
