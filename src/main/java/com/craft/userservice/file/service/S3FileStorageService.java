@@ -15,6 +15,8 @@ import org.springframework.web.multipart.MultipartFile;
 import com.craft.userservice.file.configuration.S3Properties;
 import com.craft.userservice.file.dto.FileMetadataResponseDto;
 import com.craft.userservice.file.enums.FileStorageStatus;
+import com.craft.userservice.file.enums.FileUsageType;
+import com.craft.userservice.file.enums.FileVisibility;
 import com.craft.userservice.file.exception.FileStorageException;
 import com.craft.userservice.file.model.FileMetadata;
 import com.craft.userservice.file.repository.FileMetadataRepository;
@@ -34,6 +36,10 @@ public class S3FileStorageService implements FileStorageService {
             "image/png",
             "image/webp",
             "application/pdf");
+    private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of(
+            "image/jpeg",
+            "image/png",
+            "image/webp");
 
     private final S3Client s3Client;
     private final S3Properties s3Properties;
@@ -50,10 +56,52 @@ public class S3FileStorageService implements FileStorageService {
 
     @Override
     public FileMetadataResponseDto uploadFile(MultipartFile file, String uploadedByUserId) {
-        validateUploadRequest(file, uploadedByUserId);
+        validateUploadRequest(file, uploadedByUserId, ALLOWED_CONTENT_TYPES);
 
         String originalFilename = sanitizeFilename(file.getOriginalFilename());
-        String s3Key = buildS3Key(uploadedByUserId, originalFilename);
+        String s3Key = buildPrivateS3Key(uploadedByUserId, originalFilename);
+        FileMetadata savedMetadata = uploadAndSaveMetadata(
+                file,
+                uploadedByUserId,
+                originalFilename,
+                s3Key,
+                null,
+                FileVisibility.PRIVATE,
+                FileUsageType.DOCUMENT);
+
+        return toResponseDto(savedMetadata);
+    }
+
+    @Override
+    public FileMetadataResponseDto uploadAvatar(MultipartFile file, String uploadedByUserId) {
+        validateUploadRequest(file, uploadedByUserId, ALLOWED_AVATAR_CONTENT_TYPES);
+
+        if (!StringUtils.hasText(s3Properties.getPublicBaseUrl())) {
+            throw new FileStorageException("Public file base URL is not configured.");
+        }
+
+        String originalFilename = sanitizeFilename(file.getOriginalFilename());
+        String s3Key = buildPublicAvatarS3Key(uploadedByUserId, originalFilename);
+        FileMetadata savedMetadata = uploadAndSaveMetadata(
+                file,
+                uploadedByUserId,
+                originalFilename,
+                s3Key,
+                buildPublicUrl(s3Key),
+                FileVisibility.PUBLIC,
+                FileUsageType.AVATAR);
+
+        return toResponseDto(savedMetadata);
+    }
+
+    private FileMetadata uploadAndSaveMetadata(
+            MultipartFile file,
+            String uploadedByUserId,
+            String originalFilename,
+            String s3Key,
+            String publicUrl,
+            FileVisibility visibility,
+            FileUsageType usageType) {
         String bucket = s3Properties.getBucket();
 
         try (InputStream inputStream = file.getInputStream()) {
@@ -77,14 +125,20 @@ public class S3FileStorageService implements FileStorageService {
                 .size(file.getSize())
                 .bucket(bucket)
                 .s3Key(s3Key)
-                .publicUrl(buildPublicUrl(s3Key))
+                .publicUrl(publicUrl)
+                .visibility(visibility)
+                .usageType(usageType)
                 .status(FileStorageStatus.UPLOADED)
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
 
-        FileMetadata savedMetadata = fileMetadataRepository.save(metadata);
-        return toResponseDto(savedMetadata);
+        try {
+            return fileMetadataRepository.save(metadata);
+        } catch (RuntimeException ex) {
+            tryDeleteUploadedObject(bucket, s3Key);
+            throw ex;
+        }
     }
 
     @Override
@@ -113,7 +167,7 @@ public class S3FileStorageService implements FileStorageService {
         fileMetadataRepository.save(metadata);
     }
 
-    private void validateUploadRequest(MultipartFile file, String uploadedByUserId) {
+    private void validateUploadRequest(MultipartFile file, String uploadedByUserId, Set<String> allowedContentTypes) {
         if (!StringUtils.hasText(uploadedByUserId)) {
             throw new FileStorageException("Uploaded user id is required.");
         }
@@ -140,17 +194,24 @@ public class S3FileStorageService implements FileStorageService {
             throw new FileStorageException("File content type is required.");
         }
 
-        if (!ALLOWED_CONTENT_TYPES.contains(contentType)) {
+        if (!allowedContentTypes.contains(contentType)) {
             throw new FileStorageException("File content type is not supported.");
         }
     }
 
-    private String buildS3Key(String uploadedByUserId, String sanitizedFilename) {
+    private String buildPrivateS3Key(String uploadedByUserId, String sanitizedFilename) {
         LocalDate today = LocalDate.now(ZoneOffset.UTC);
         return "users/%s/uploads/%04d/%02d/%s-%s".formatted(
                 sanitizePathSegment(uploadedByUserId),
                 today.getYear(),
                 today.getMonthValue(),
+                UUID.randomUUID(),
+                sanitizedFilename);
+    }
+
+    private String buildPublicAvatarS3Key(String uploadedByUserId, String sanitizedFilename) {
+        return "public/users/%s/avatar/%s-%s".formatted(
+                sanitizePathSegment(uploadedByUserId),
                 UUID.randomUUID(),
                 sanitizedFilename);
     }
@@ -182,6 +243,17 @@ public class S3FileStorageService implements FileStorageService {
         return publicBaseUrl.endsWith("/") ? publicBaseUrl + s3Key : publicBaseUrl + "/" + s3Key;
     }
 
+    private void tryDeleteUploadedObject(String bucket, String s3Key) {
+        try {
+            DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
+                    .bucket(bucket)
+                    .key(s3Key)
+                    .build();
+            s3Client.deleteObject(deleteObjectRequest);
+        } catch (S3Exception | SdkClientException ignored) {
+        }
+    }
+
     private FileMetadataResponseDto toResponseDto(FileMetadata metadata) {
         return FileMetadataResponseDto.builder()
                 .id(metadata.getId())
@@ -192,6 +264,8 @@ public class S3FileStorageService implements FileStorageService {
                 .bucket(metadata.getBucket())
                 .s3Key(metadata.getS3Key())
                 .publicUrl(metadata.getPublicUrl())
+                .visibility(metadata.getVisibility())
+                .usageType(metadata.getUsageType())
                 .status(metadata.getStatus())
                 .createdAt(metadata.getCreatedAt())
                 .updatedAt(metadata.getUpdatedAt())
