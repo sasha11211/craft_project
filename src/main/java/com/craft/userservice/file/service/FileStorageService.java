@@ -8,5 +8,7 @@ import com.craft.userservice.file.model.FileMetadata;
 public interface FileStorageService {
     FileMetadataResponseDto uploadFile(MultipartFile file, String uploadedByUserId);
 
+    FileMetadataResponseDto uploadAvatar(MultipartFile file, String uploadedByUserId);
+
     void deleteFile(FileMetadata metadata);
 }

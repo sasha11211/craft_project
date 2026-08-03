@@ -238,7 +238,9 @@ public class UserServiceImpl implements UserService {
 				user.setAddress(address);
 			}
 
+			String currentAvatarUrl = user.getAvatarUrl();
 			modelMapper.map(updateUserDto, user);
+			user.setAvatarUrl(currentAvatarUrl);
 			user.setUpdatedAt(Instant.now());
 			userRepository.save(user);
 

@@ -27,10 +27,6 @@ import software.amazon.awssdk.services.s3.model.DeleteObjectResponse;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectResponse;
 
-/**
- * Service-layer tests only. TODO: add content-type validation tests when
- * S3FileStorageService validates allowed content types.
- */
 @ExtendWith(MockitoExtension.class)
 class S3FileStorageServiceTest {
     private static final String BUCKET = "test-bucket";
@@ -89,6 +85,36 @@ class S3FileStorageServiceTest {
     }
 
     @Test
+    void uploadFile_whenContentTypeIsUnsupported_fails() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "notes.txt",
+                "text/plain",
+                "not allowed".getBytes());
+
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
+                .hasMessage("File content type is not supported.");
+
+        verifyNoInteractions(s3Client, fileMetadataRepository);
+    }
+
+    @Test
+    void uploadFile_whenContentTypeIsMissing_fails() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "photo.png",
+                null,
+                "image bytes".getBytes());
+
+        assertThatThrownBy(() -> uploadFile(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
+                .hasMessage("File content type is required.");
+
+        verifyNoInteractions(s3Client, fileMetadataRepository);
+    }
+
+    @Test
     void uploadFile_whenValid_callsS3PutObject() throws Throwable {
         MockMultipartFile file = validFile();
         when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
@@ -127,7 +153,9 @@ class S3FileStorageServiceTest {
         assertThat(get(metadata, "getSize")).isEqualTo(file.getSize());
         assertThat(get(metadata, "getBucket")).isEqualTo(BUCKET);
         assertThat(get(metadata, "getS3Key").toString()).startsWith("users/user-123/uploads/");
-        assertThat(get(metadata, "getPublicUrl")).isEqualTo(PUBLIC_BASE_URL + "/" + get(metadata, "getS3Key"));
+        assertThat(get(metadata, "getPublicUrl")).isNull();
+        assertThat(get(metadata, "getVisibility").toString()).isEqualTo("PRIVATE");
+        assertThat(get(metadata, "getUsageType").toString()).isEqualTo("DOCUMENT");
         assertThat(get(metadata, "getStatus").toString()).isEqualTo("UPLOADED");
         assertThat(get(metadata, "getCreatedAt")).isNotNull();
         assertThat(get(metadata, "getUpdatedAt")).isNotNull();
@@ -149,10 +177,44 @@ class S3FileStorageServiceTest {
         assertThat(get(response, "getSize")).isEqualTo(file.getSize());
         assertThat(get(response, "getBucket")).isEqualTo(BUCKET);
         assertThat(get(response, "getS3Key").toString()).startsWith("users/user-123/uploads/");
-        assertThat(get(response, "getPublicUrl")).isEqualTo(PUBLIC_BASE_URL + "/" + get(response, "getS3Key"));
+        assertThat(get(response, "getPublicUrl")).isNull();
+        assertThat(get(response, "getVisibility").toString()).isEqualTo("PRIVATE");
+        assertThat(get(response, "getUsageType").toString()).isEqualTo("DOCUMENT");
         assertThat(get(response, "getStatus").toString()).isEqualTo("UPLOADED");
         assertThat(get(response, "getCreatedAt")).isNotNull();
         assertThat(get(response, "getUpdatedAt")).isNotNull();
+    }
+
+    @Test
+    void uploadAvatar_whenValid_usesPublicAvatarKeyAndUrl() throws Throwable {
+        MockMultipartFile file = validFile();
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+        whenSaveSetsIdAndReturnsMetadata("avatar-file-123");
+
+        Object response = uploadAvatar(file);
+
+        assertThat(get(response, "getId")).isEqualTo("avatar-file-123");
+        assertThat(get(response, "getUploadedByUserId")).isEqualTo(USER_ID);
+        assertThat(get(response, "getS3Key").toString()).startsWith("public/users/user-123/avatar/");
+        assertThat(get(response, "getPublicUrl")).isEqualTo(PUBLIC_BASE_URL + "/" + get(response, "getS3Key"));
+        assertThat(get(response, "getVisibility").toString()).isEqualTo("PUBLIC");
+        assertThat(get(response, "getUsageType").toString()).isEqualTo("AVATAR");
+    }
+
+    @Test
+    void uploadAvatar_whenFileIsPdf_fails() throws Exception {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "profile.pdf",
+                "application/pdf",
+                "pdf bytes".getBytes());
+
+        assertThatThrownBy(() -> uploadAvatar(file))
+                .isInstanceOf(runtimeException("com.craft.userservice.file.exception.FileStorageException"))
+                .hasMessage("File content type is not supported.");
+
+        verifyNoInteractions(s3Client, fileMetadataRepository);
     }
 
     @Test
@@ -199,6 +261,10 @@ class S3FileStorageServiceTest {
 
     private Object uploadFile(MultipartFile file) throws Throwable {
         return invokeService("uploadFile", new Class<?>[] { MultipartFile.class, String.class }, file, USER_ID);
+    }
+
+    private Object uploadAvatar(MultipartFile file) throws Throwable {
+        return invokeService("uploadAvatar", new Class<?>[] { MultipartFile.class, String.class }, file, USER_ID);
     }
 
     private void deleteFile(Object metadata) throws Throwable {
