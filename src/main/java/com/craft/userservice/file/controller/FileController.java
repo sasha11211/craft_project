@@ -1,6 +1,7 @@
 package com.craft.userservice.file.controller;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -67,6 +68,47 @@ public class FileController {
         }
     }
 
+    @PostMapping("/avatar")
+    public ResponseEntity<?> uploadAvatar(@RequestParam("file") MultipartFile file, Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        try {
+            String email = (String) authentication.getPrincipal();
+            User user = userRepository.findByEmail(email).orElse(null);
+            if (user == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+            }
+
+            String previousAvatarUrl = user.getAvatarUrl();
+            FileMetadataResponseDto avatar = fileStorageService.uploadAvatar(file, user.getId());
+
+            user.setAvatarUrl(avatar.getPublicUrl());
+            user.setUpdatedAt(Instant.now());
+            try {
+                userRepository.save(user);
+            } catch (RuntimeException ex) {
+                fileMetadataRepository.findById(avatar.getId()).ifPresent(metadata -> {
+                    try {
+                        fileStorageService.deleteFile(metadata);
+                    } catch (FileStorageException ignored) {
+                    }
+                });
+                throw ex;
+            }
+
+            deletePreviousAvatarIfStored(user.getId(), previousAvatarUrl, avatar.getPublicUrl());
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(toUserAvatarResponse(user, avatar));
+        } catch (FileStorageException e) {
+            HttpStatus status = isStorageFailure(e) ? HttpStatus.INTERNAL_SERVER_ERROR : HttpStatus.BAD_REQUEST;
+            return ResponseEntity.status(status).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
+        }
+    }
+
     @GetMapping("/my")
     public ResponseEntity<?> getMyFiles(Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
@@ -87,6 +129,30 @@ public class FileController {
                 .toList();
 
         return ResponseEntity.ok(files);
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getFileMetadata(@PathVariable String id, Authentication authentication) {
+        if (authentication == null || authentication.getPrincipal() == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        String email = (String) authentication.getPrincipal();
+        User user = userRepository.findByEmail(email).orElse(null);
+        if (user == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Unauthorized");
+        }
+
+        FileMetadata metadata = fileMetadataRepository.findById(id).orElse(null);
+        if (metadata == null || metadata.getStatus() == FileStorageStatus.DELETED) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("File not found");
+        }
+
+        if (!user.getId().equals(metadata.getUploadedByUserId())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Forbidden");
+        }
+
+        return ResponseEntity.ok(toResponseDto(metadata));
     }
 
     @GetMapping("/{id}/download-url")
@@ -177,10 +243,34 @@ public class FileController {
                 .bucket(metadata.getBucket())
                 .s3Key(metadata.getS3Key())
                 .publicUrl(metadata.getPublicUrl())
+                .visibility(metadata.getVisibility())
+                .usageType(metadata.getUsageType())
                 .status(metadata.getStatus())
                 .createdAt(metadata.getCreatedAt())
                 .updatedAt(metadata.getUpdatedAt())
                 .build();
+    }
+
+    private Object toUserAvatarResponse(User user, FileMetadataResponseDto avatar) {
+        return java.util.Map.of(
+                "userId", user.getId(),
+                "avatarUrl", user.getAvatarUrl(),
+                "file", avatar);
+    }
+
+    private void deletePreviousAvatarIfStored(String userId, String previousAvatarUrl, String newAvatarUrl) {
+        if (!StringUtils.hasText(previousAvatarUrl) || previousAvatarUrl.equals(newAvatarUrl)) {
+            return;
+        }
+
+        fileMetadataRepository.findByUploadedByUserIdAndPublicUrl(userId, previousAvatarUrl)
+                .filter(metadata -> metadata.getStatus() != FileStorageStatus.DELETED)
+                .ifPresent(metadata -> {
+                    try {
+                        fileStorageService.deleteFile(metadata);
+                    } catch (FileStorageException ignored) {
+                    }
+                });
     }
 
     private boolean isStorageFailure(FileStorageException exception) {

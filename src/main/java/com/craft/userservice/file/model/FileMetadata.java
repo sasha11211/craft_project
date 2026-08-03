@@ -7,6 +7,8 @@ import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.craft.userservice.file.enums.FileStorageStatus;
+import com.craft.userservice.file.enums.FileUsageType;
+import com.craft.userservice.file.enums.FileVisibility;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,6 +33,8 @@ public class FileMetadata {
     @Indexed(unique = true)
     private String s3Key;
     private String publicUrl;
+    private FileVisibility visibility;
+    private FileUsageType usageType;
     private FileStorageStatus status;
     private Instant createdAt;
     private Instant updatedAt;
