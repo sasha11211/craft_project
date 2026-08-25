@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.craft.userservice.user.dto.AddRoleDto;
 import com.craft.userservice.user.dto.LoginRequestDto;
 import com.craft.userservice.user.dto.RegisterRequestDto;
 import com.craft.userservice.user.dto.UpdateUserDto;
@@ -25,7 +24,7 @@ public class UserController {
 	private final UserServiceImpl userService;
 
 	@PostMapping("/auth/register")
-	public ResponseEntity<?> register(@RequestBody RegisterRequestDto registerRequestDto) {
+	public ResponseEntity<?> register(@Valid @RequestBody RegisterRequestDto registerRequestDto) {
 		return userService.register(registerRequestDto);
 	}
 
@@ -58,11 +57,6 @@ public class UserController {
 	public ResponseEntity<?> updateCurrentUser(@Valid @RequestBody UpdateUserDto request,
 			Authentication authentication) {
 		return userService.updateUser(request, authentication);
-	}
-	
-	@PostMapping("/role/add")
-	public ResponseEntity<?> addRole(@ Valid @RequestBody AddRoleDto addRoleDto, Authentication authentication) {
-		return userService.addRole(addRoleDto, authentication);
 	}
 
 }

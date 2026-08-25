@@ -91,7 +91,6 @@ POST /api/user/auth/logout
 POST /api/user/auth/logout-all
 GET  /api/user/current
 PUT  /api/user/update
-POST /api/user/role/add
 ```
 
 ## File Storage Goal
