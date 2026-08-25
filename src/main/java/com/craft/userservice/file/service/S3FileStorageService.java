@@ -39,7 +39,8 @@ public class S3FileStorageService implements FileStorageService {
     private static final Set<String> ALLOWED_AVATAR_CONTENT_TYPES = Set.of(
             "image/jpeg",
             "image/png",
-            "image/webp");
+            "image/webp",
+            "image/svg+xml");
 
     private final S3Client s3Client;
     private final S3Properties s3Properties;

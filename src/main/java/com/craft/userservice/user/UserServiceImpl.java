@@ -1,7 +1,6 @@
 package com.craft.userservice.user;
 
 import java.time.Instant;
-import java.util.EnumSet;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -19,7 +18,6 @@ import com.craft.userservice.configuration.enums.Role;
 import com.craft.userservice.jwt.RefreshTokenService;
 import com.craft.userservice.jwt.model.RefreshToken;
 import com.craft.userservice.security.JwtUtil;
-import com.craft.userservice.user.dto.AddRoleDto;
 import com.craft.userservice.user.dto.LoginRequestDto;
 import com.craft.userservice.user.dto.RegisterRequestDto;
 import com.craft.userservice.user.dto.UpdateUserDto;
@@ -72,22 +70,19 @@ public class UserServiceImpl implements UserService {
 		if (userRepository.existsByEmail(email)) {
 			return ResponseEntity.status(HttpStatus.CONFLICT).body("Email already in use");
 		}
+		if (userRepository.existsByMobile(registerRequestDto.getMobile())) {
+			return ResponseEntity.status(HttpStatus.CONFLICT).body("Mobile already in use");
+		}
 		User user = User.builder()
 				.email(email)
 				.password(passwordEncoder.encode(registerRequestDto.getPassword()))
-				.roles(new HashSet<>(Set.of(Role.ROLE_CUSTOMER)))
+				.roles(new HashSet<>(Set.of(Role.ROLE_USER)))
+				.fullName(registerRequestDto.getFullName())
+				.mobile(registerRequestDto.getMobile())
+				.address(modelMapper.map(registerRequestDto.getAddress(), Address.class))
 				.createdAt(Instant.now())
 				.updatedAt(Instant.now())
 				.build();
-		if (registerRequestDto.getFirstName() != null && !registerRequestDto.getFirstName().isBlank()) {
-			user.setFirstName(registerRequestDto.getFirstName());
-		}
-		if (registerRequestDto.getLastName() != null && !registerRequestDto.getLastName().isBlank()) {
-			user.setLastName(registerRequestDto.getLastName());
-		}
-		if (registerRequestDto.isRegisterAsSeller()) {
-			user.getRoles().add(Role.ROLE_SELLER);
-		} 
 
 		userRepository.save(user);
 		UserResponseDto userResponseDto = modelMapper.map(user, UserResponseDto.class);
@@ -224,14 +219,6 @@ public class UserServiceImpl implements UserService {
 							throw new IllegalArgumentException("Mobile already in use");
 						});
 			}
-			// перевірка унікальності логіна
-			if (updateUserDto.getUserName() != null && !updateUserDto.getUserName().isBlank()) {
-				userRepository.findByUserName(updateUserDto.getUserName())
-						.filter(other -> !other.getId().equals(user.getId())).ifPresent(other -> {
-							throw new IllegalArgumentException("User name already in use");
-						});
-				user.setUserName(updateUserDto.getUserName());
-			}
 			// адреса
 			if (updateUserDto.getAddress() != null) {
 				Address address = modelMapper.map(updateUserDto.getAddress(), Address.class);
@@ -254,38 +241,6 @@ public class UserServiceImpl implements UserService {
 			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
 		}
 
-	}
-
-	@Override
-	public ResponseEntity<?> addRole(AddRoleDto addRoleDto, Authentication authentication) {
-		try {
-			if (authentication == null || authentication.getPrincipal() == null) {
-				return ResponseEntity.status(401).body("Unauthorized");
-			}
-			Role role = Role.valueOf(addRoleDto.getRole());
-			// не дозволяємо самостійно призначати не-whitelisted ролі
-			if (role == null || !EnumSet.of(Role.ROLE_SELLER).contains(role)) {
-				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("This role cannot be self-assigned");
-			}
-			String email = (String) authentication.getPrincipal();
-			User user = userRepository.findByEmail(email).orElseThrow(() -> new UserNotFoundException(email));
-
-			if (user.getRoles() != null && user.getRoles().contains(role)) {
-				UpdateUserResponseDto updateUserResponseDto = modelMapper.map(user, UpdateUserResponseDto.class);
-				return ResponseEntity.ok(updateUserResponseDto);
-			}
-			user.getRoles().add(role);
-			user.setUpdatedAt(Instant.now());
-			userRepository.save(user);
-			UpdateUserResponseDto updateUserResponseDto = modelMapper.map(user, UpdateUserResponseDto.class);
-			return ResponseEntity.ok(updateUserResponseDto);
-		} catch (UserNotFoundException e) {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
-		} catch (IllegalArgumentException | NullPointerException e) {
-			return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid role value");
-		} catch (Exception e) {
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Internal server error");
-		}
 	}
 
 }

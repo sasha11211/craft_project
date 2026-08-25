@@ -11,8 +11,5 @@ import lombok.NoArgsConstructor;
 @Builder
 public class Address {
 	String city;
-	String street;
-	String building;
-	String postalCode;
 
 }
