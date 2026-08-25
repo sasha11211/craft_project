@@ -111,18 +111,6 @@ First version should support:
 - optionally generate pre-signed download URL later
 - delete file from S3 and metadata later
 
-## Important Rules for Codex
-
-- Do not rewrite existing authentication code unless the task explicitly requires it.
-- Do not change existing user registration/login/refresh logic unless the task explicitly requires it.
-- Do not hardcode AWS credentials.
-- Use environment variables or Spring configuration properties.
-- Use `ResponseEntity<?>` in controllers where it matches the current style.
-- Keep changes small and isolated.
-- Prefer DTOs for API responses.
-- Store metadata in MongoDB, not only the S3 URL.
-- Do not store uploaded file bytes in MongoDB.
-
 ## Required Environment Variables
 
 Example values only:
@@ -148,29 +136,4 @@ Example:
 
 ```text
 uploads/PRODUCT/64f1abc123/2026/05/9f7d2a-product-photo.jpg
-```
-
-## How to Use with Codex
-
-Ask Codex to read these files first:
-
-```text
-README.md
-PROJECT_CONTEXT.md
-CODEX_TASKS.md
-```
-
-Then run one focused task at a time.
-
-Example prompt:
-
-```text
-Read README.md, PROJECT_CONTEXT.md and CODEX_TASKS.md.
-
-Implement Task 1 only: add AWS S3 configuration.
-
-Keep changes isolated.
-Do not rewrite existing auth/security/user logic.
-Use the existing package root com.craft.userservice.
-After changes, explain which files were added or modified and how to test configuration loading.
 ```
