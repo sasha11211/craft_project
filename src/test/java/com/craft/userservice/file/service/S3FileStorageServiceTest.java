@@ -203,6 +203,26 @@ class S3FileStorageServiceTest {
     }
 
     @Test
+    void uploadAvatar_whenFileIsSvg_succeeds() throws Throwable {
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "profile.svg",
+                "image/svg+xml",
+                "<svg xmlns=\"http://www.w3.org/2000/svg\"></svg>".getBytes());
+        when(s3Client.putObject(any(PutObjectRequest.class), any(RequestBody.class)))
+                .thenReturn(PutObjectResponse.builder().build());
+        whenSaveSetsIdAndReturnsMetadata("avatar-svg-123");
+
+        Object response = uploadAvatar(file);
+
+        assertThat(get(response, "getId")).isEqualTo("avatar-svg-123");
+        assertThat(get(response, "getOriginalFilename")).isEqualTo("profile.svg");
+        assertThat(get(response, "getContentType")).isEqualTo("image/svg+xml");
+        assertThat(get(response, "getS3Key").toString()).startsWith("public/users/user-123/avatar/");
+        assertThat(get(response, "getS3Key").toString()).endsWith("-profile.svg");
+    }
+
+    @Test
     void uploadAvatar_whenFileIsPdf_fails() throws Exception {
         MockMultipartFile file = new MockMultipartFile(
                 "file",
